@@ -587,7 +587,8 @@ public class CodexMcpServerManager {
         Process process = null;
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
+            pb.redirectErrorStream(false);
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
             if (serverConfig.has("cwd") && !serverConfig.get("cwd").isJsonNull()) {
                 String cwd = serverConfig.get("cwd").getAsString();
@@ -609,14 +610,28 @@ public class CodexMcpServerManager {
             LOG.info("[CodexMcpServerManager] Failed to start STDIO server " + serverName + ": " + e.getMessage());
             return "failed";
         } finally {
-            if (process != null && process.isAlive()) {
-                process.destroy();
+            if (process != null) {
                 try {
-                    if (!process.waitFor(300, TimeUnit.MILLISECONDS)) {
-                        process.destroyForcibly();
+                    process.getInputStream().close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    process.getOutputStream().close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    process.getErrorStream().close();
+                } catch (IOException ignored) {
+                }
+                if (process.isAlive()){
+                    process.destroy();
+                    try {
+                        if (!process.waitFor(300, TimeUnit.MILLISECONDS)) {
+                            process.destroyForcibly();
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                 }
             }
         }
@@ -631,6 +646,7 @@ public class CodexMcpServerManager {
             writer.write(MCP_INIT_REQUEST);
             writer.write("\n");
             writer.flush();
+            process.getOutputStream().close();
 
             Future<JsonObject> responseFuture = executor.submit(() -> readInitializeResponse(process));
             JsonObject response = responseFuture.get(STDIO_HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
@@ -664,6 +680,11 @@ public class CodexMcpServerManager {
             return "failed";
         } finally {
             executor.shutdownNow();
+            try {
+                executor.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -681,15 +702,15 @@ public class CodexMcpServerManager {
 
                 try {
                     JsonObject json = JsonParser.parseString(trimmed).getAsJsonObject();
-                    if (json.has("id") && json.get("id").isJsonPrimitive() && json.get("id").getAsInt() == 1) {
+                    if (json.has("id") && "1".equals(json.get("id").getAsString())) {
                         return json;
                     }
                 } catch (Exception ignored) {
                     // Partial/non-JSON output; keep reading until timeout or matching response appears.
                 }
             }
-        } catch (IOException ignored) {
-            // Return null below when stream closes/errors.
+        } catch (IOException e) {
+            LOG.debug("[CodexMcpServerManager] IO error reading STDIO response: " + e.getMessage());
         }
         return null;
     }
