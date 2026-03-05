@@ -25,6 +25,8 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
      */
     public interface JsTarget {
         void callJavaScript(String functionName, String... args);
+
+        void executeJavaScriptCode(String jsCode);
     }
 
     private final StreamMessageCoalescer streamCoalescer;
@@ -165,6 +167,22 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
     @Override
     public void onThinkingDelta(String delta) {
         jsTarget.callJavaScript("onThinkingDelta", JsUtils.escapeJs(delta));
+    }
+
+    @Override
+    public void onUsageUpdate(int usedTokens, int maxTokens) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            double percentage = maxTokens > 0 ? (usedTokens * 100.0 / maxTokens) : 0.0;
+            String json = String.format("{\"percentage\":%.2f,\"usedTokens\":%d,\"maxTokens\":%d}",
+                    percentage, usedTokens, maxTokens);
+            String js = "(function() {" +
+                    "  if (typeof window.onUsageUpdate === 'function') {" +
+                    "    window.onUsageUpdate('" + JsUtils.escapeJs(json) + "');" +
+                    "  }" +
+                    "})();";
+            jsTarget.executeJavaScriptCode(js);
+            LOG.debug("Usage update sent to frontend: " + usedTokens + "/" + maxTokens);
+        });
     }
 
     /**
