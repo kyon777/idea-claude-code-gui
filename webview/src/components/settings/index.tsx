@@ -72,10 +72,9 @@ const SettingsView = ({
 }: SettingsViewProps) => {
   const { t } = useTranslation();
   const isCodexMode = currentProvider === 'codex';
-  // Codex mode: allow providers, usage, mcp, skills, permissions tabs, disable unsupported features
-  // Note: 'skills' is enabled for Codex as it supports .agents/skills/ directories
+  // Codex mode: align with Claude capabilities for settings tabs
   const disabledTabs = useMemo<SettingsTab[]>(
-    () => (isCodexMode ? ['agents'] : []),
+    () => [],
     [isCodexMode]
   );
   const [currentTab, setCurrentTab] = useState<SettingsTab>(() => {
