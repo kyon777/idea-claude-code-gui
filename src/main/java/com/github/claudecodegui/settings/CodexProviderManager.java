@@ -2,8 +2,6 @@ package com.github.claudecodegui.settings;
 
 import com.github.claudecodegui.model.DeleteResult;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
 
@@ -64,7 +62,7 @@ public class CodexProviderManager {
         String currentId = codex.has("current") ? codex.get("current").getAsString() : null;
 
         // Get provider order from config, or use default order (by key)
-        List<String> orderedIds = getProviderOrder(codex, providers.keySet());
+        List<String> orderedIds = ProviderOrderHelper.getProviderOrder(codex, providers.keySet());
 
         // Add providers in order
         for (String id : orderedIds) {
@@ -84,33 +82,6 @@ public class CodexProviderManager {
     }
 
     /**
-     * Get provider order from config, or return default order based on keys.
-     */
-    private List<String> getProviderOrder(JsonObject codex, java.util.Set<String> providerKeys) {
-        List<String> order = new ArrayList<>();
-
-        // Try to get saved order from config
-        if (codex.has("providerOrder") && codex.get("providerOrder").isJsonArray()) {
-            JsonArray savedOrder = codex.getAsJsonArray("providerOrder");
-            for (JsonElement e : savedOrder) {
-                String id = e.getAsString();
-                if (providerKeys.contains(id)) {
-                    order.add(id);
-                }
-            }
-        }
-
-        // Add any providers not in the saved order
-        for (String key : providerKeys) {
-            if (!order.contains(key)) {
-                order.add(key);
-            }
-        }
-
-        return order;
-    }
-
-    /**
      * Save provider order.
      */
     public void saveProviderOrder(List<String> orderedIds) throws IOException {
@@ -124,11 +95,7 @@ public class CodexProviderManager {
         }
 
         JsonObject codex = config.getAsJsonObject("codex");
-        JsonArray orderArray = new JsonArray();
-        for (String id : orderedIds) {
-            orderArray.add(id);
-        }
-        codex.add("providerOrder", orderArray);
+        ProviderOrderHelper.setProviderOrder(codex, orderedIds);
 
         configWriter.accept(config);
         LOG.info("[CodexProviderManager] Saved provider order: " + orderedIds);
@@ -345,16 +312,7 @@ public class CodexProviderManager {
             }
 
             // Remove deleted provider from providerOrder to avoid stale IDs
-            if (codex.has("providerOrder") && codex.get("providerOrder").isJsonArray()) {
-                JsonArray oldOrder = codex.getAsJsonArray("providerOrder");
-                JsonArray newOrder = new JsonArray();
-                for (JsonElement e : oldOrder) {
-                    if (!e.getAsString().equals(id)) {
-                        newOrder.add(e);
-                    }
-                }
-                codex.add("providerOrder", newOrder);
-            }
+            ProviderOrderHelper.removeFromOrder(codex, id);
 
             // Write config
             configWriter.accept(config);

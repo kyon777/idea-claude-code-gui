@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CodexProviderConfig } from '../../../types/provider';
 import { sendToJava } from '../../../utils/bridge';
+import { useDragSort } from '../hooks/useDragSort';
 import styles from './style.module.less';
 
 interface CodexProviderSectionProps {
@@ -24,67 +25,24 @@ const CodexProviderSection = ({
   showHeader = true,
 }: CodexProviderSectionProps) => {
   const { t } = useTranslation();
-  const [draggedProviderId, setDraggedProviderId] = useState<string | null>(null);
-  const [dragOverProviderId, setDragOverProviderId] = useState<string | null>(null);
-  const [localProviders, setLocalProviders] = useState<CodexProviderConfig[]>(codexProviders);
 
-  // Sync localProviders from props (e.g. isActive changes pushed from backend)
-  useEffect(() => {
-    setLocalProviders(codexProviders);
-  }, [codexProviders]);
-
-  // Drag-and-drop handlers
-  const handleDragStart = useCallback((e: React.DragEvent, providerId: string) => {
-    setDraggedProviderId(providerId);
-    e.dataTransfer.effectAllowed = 'move';
+  const onSort = useCallback((orderedIds: string[]) => {
+    sendToJava('sort_codex_providers', { orderedIds });
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, providerId: string) => {
-    e.preventDefault();
-    if (draggedProviderId === null) return;
-    if (draggedProviderId !== providerId) {
-      setDragOverProviderId(providerId);
-    }
-  }, [draggedProviderId]);
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverProviderId(null);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetProviderId: string) => {
-    e.preventDefault();
-    if (draggedProviderId === null || draggedProviderId === targetProviderId) {
-      setDraggedProviderId(null);
-      setDragOverProviderId(null);
-      return;
-    }
-
-    const draggedIndex = localProviders.findIndex(p => p.id === draggedProviderId);
-    const targetIndex = localProviders.findIndex(p => p.id === targetProviderId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedProviderId(null);
-      setDragOverProviderId(null);
-      return;
-    }
-
-    const newOrder = [...localProviders];
-    const [removed] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, removed);
-
-    // Optimistic update: reflect new order immediately without waiting for backend
-    setLocalProviders(newOrder);
-
-    sendToJava('sort_codex_providers', { orderedIds: newOrder.map(p => p.id) });
-
-    setDraggedProviderId(null);
-    setDragOverProviderId(null);
-  }, [draggedProviderId, localProviders]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedProviderId(null);
-    setDragOverProviderId(null);
-  }, []);
+  const {
+    localItems: localProviders,
+    draggedId: draggedProviderId,
+    dragOverId: dragOverProviderId,
+    handleDragStart,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDragEnd,
+  } = useDragSort({
+    items: codexProviders,
+    onSort,
+  });
 
   return (
     <div className={styles.configSection}>
@@ -117,7 +75,12 @@ const CodexProviderSection = ({
               localProviders.map((provider) => (
                 <div
                   key={provider.id}
-                  className={`${styles.providerCard} ${provider.isActive ? styles.active : ''} ${draggedProviderId === provider.id ? styles.dragging : ''} ${dragOverProviderId === provider.id ? styles.dragOver : ''}`}
+                  className={[
+                    styles.providerCard,
+                    provider.isActive && styles.active,
+                    draggedProviderId === provider.id && styles.dragging,
+                    dragOverProviderId === provider.id && styles.dragOver,
+                  ].filter(Boolean).join(' ')}
                   draggable={true}
                   onDragStart={(e) => handleDragStart(e, provider.id)}
                   onDragOver={(e) => handleDragOver(e, provider.id)}

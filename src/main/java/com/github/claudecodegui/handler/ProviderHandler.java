@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 public class ProviderHandler extends BaseMessageHandler {
 
     private static final Logger LOG = Logger.getInstance(ProviderHandler.class);
+    private static final Gson GSON = new Gson();
 
     private static final String[] SUPPORTED_TYPES = {
             // Claude provider operations
@@ -147,7 +148,7 @@ public class ProviderHandler extends BaseMessageHandler {
             payload.addProperty("enabled", value);
             payload.addProperty("explicit", enabled != null);
 
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String json = gson.toJson(payload);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -160,7 +161,7 @@ public class ProviderHandler extends BaseMessageHandler {
 
     private void handleSetThinkingEnabled(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             Boolean enabled = null;
             if (content != null && !content.trim().isEmpty()) {
                 try {
@@ -201,7 +202,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetProviders() {
         try {
             List<JsonObject> providers = context.getSettingsService().getClaudeProviders();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String providersJson = gson.toJson(providers);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -218,7 +219,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetCurrentClaudeConfig() {
         try {
             JsonObject config = context.getSettingsService().getCurrentClaudeConfig();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String configJson = gson.toJson(config);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -234,7 +235,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleAddProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject provider = gson.fromJson(content, JsonObject.class);
             context.getSettingsService().addClaudeProvider(provider);
 
@@ -254,7 +255,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleUpdateProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             String id = data.get("id").getAsString();
             JsonObject updates = data.getAsJsonObject("updates");
@@ -293,7 +294,7 @@ public class ProviderHandler extends BaseMessageHandler {
         LOG.debug("[ProviderHandler] Received content: " + content);
 
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             LOG.debug("[ProviderHandler] Parsed JSON data: " + data);
 
@@ -341,7 +342,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleSwitchProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             String id = data.get("id").getAsString();
 
@@ -415,7 +416,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetActiveProvider() {
         try {
             JsonObject provider = context.getSettingsService().getActiveClaudeProvider();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String providerJson = gson.toJson(provider);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -453,7 +454,7 @@ public class ProviderHandler extends BaseMessageHandler {
             CompletableFuture.runAsync(() -> {
                 try {
                     LOG.info("[ProviderHandler] Starting to read database file...");
-                    Gson gson = new Gson();
+                    Gson gson = GSON;
                     List<JsonObject> providers = context.getSettingsService().parseProvidersFromCcSwitchDb(dbFile.getPath());
 
                     if (providers.isEmpty()) {
@@ -557,7 +558,7 @@ public class ProviderHandler extends BaseMessageHandler {
                 CompletableFuture.runAsync(() -> {
                     try {
                         LOG.info("[ProviderHandler] Starting to read user-selected database file...");
-                        Gson gson = new Gson();
+                        Gson gson = GSON;
                         List<JsonObject> providers = context.getSettingsService().parseProvidersFromCcSwitchDb(dbFile.getPath());
 
                         if (providers.isEmpty()) {
@@ -599,7 +600,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleSaveImportedProviders(String content) {
         CompletableFuture.runAsync(() -> {
             try {
-                Gson gson = new Gson();
+                Gson gson = GSON;
                 JsonObject request = gson.fromJson(content, JsonObject.class);
                 JsonArray providersArray = request.getAsJsonArray("providers");
 
@@ -669,7 +670,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetCodexProviders() {
         try {
             List<JsonObject> providers = context.getSettingsService().getCodexProviders();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String providersJson = gson.toJson(providers);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -686,7 +687,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetCurrentCodexConfig() {
         try {
             JsonObject config = context.getSettingsService().getCurrentCodexConfig();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String configJson = gson.toJson(config);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -702,7 +703,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleAddCodexProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject provider = gson.fromJson(content, JsonObject.class);
             context.getSettingsService().addCodexProvider(provider);
 
@@ -722,7 +723,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleUpdateCodexProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             String id = data.get("id").getAsString();
             JsonObject updates = data.getAsJsonObject("updates");
@@ -761,7 +762,7 @@ public class ProviderHandler extends BaseMessageHandler {
         LOG.debug("[ProviderHandler] Received content: " + content);
 
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             LOG.debug("[ProviderHandler] Parsed JSON data: " + data);
 
@@ -806,7 +807,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private void handleSwitchCodexProvider(String content) {
         try {
-            Gson gson = new Gson();
+            Gson gson = GSON;
             JsonObject data = gson.fromJson(content, JsonObject.class);
             String id = data.get("id").getAsString();
 
@@ -833,7 +834,7 @@ public class ProviderHandler extends BaseMessageHandler {
     private void handleGetActiveCodexProvider() {
         try {
             JsonObject provider = context.getSettingsService().getActiveCodexProvider();
-            Gson gson = new Gson();
+            Gson gson = GSON;
             String providerJson = gson.toJson(provider);
 
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -866,8 +867,7 @@ public class ProviderHandler extends BaseMessageHandler {
      */
     private List<String> parseOrderedIds(String content, String context) {
         try {
-            Gson gson = new Gson();
-            JsonObject data = gson.fromJson(content, JsonObject.class);
+            JsonObject data = GSON.fromJson(content, JsonObject.class);
             JsonArray orderedIdsArray = data.getAsJsonArray("orderedIds");
             if (orderedIdsArray == null || orderedIdsArray.isEmpty()) {
                 LOG.warn("[ProviderHandler] No orderedIds provided for " + context);

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderConfig } from '../../../types/provider';
 import { sendToJava } from '../../../utils/bridge';
+import { useDragSort } from '../hooks/useDragSort';
 import ImportConfirmDialog from './ImportConfirmDialog';
 import styles from './style.module.less';
 
@@ -32,70 +33,26 @@ export default function ProviderList({
   const [editingCcSwitchProvider, setEditingCcSwitchProvider] = useState<ProviderConfig | null>(null);
   const [convertingProvider, setConvertingProvider] = useState<ProviderConfig | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [draggedProviderId, setDraggedProviderId] = useState<string | null>(null);
-  const [dragOverProviderId, setDragOverProviderId] = useState<string | null>(null);
-  const [localProviders, setLocalProviders] = useState<ProviderConfig[]>(providers);
   const importMenuRef = useRef<HTMLDivElement>(null);
 
-  // Sync localProviders from props (e.g. isActive changes pushed from backend)
-  useEffect(() => {
-    setLocalProviders(providers);
-  }, [providers]);
-
-  // Drag-and-drop handlers
-  const handleDragStart = useCallback((e: React.DragEvent, providerId: string) => {
-    setDraggedProviderId(providerId);
-    e.dataTransfer.effectAllowed = 'move';
+  const onSort = useCallback((orderedIds: string[]) => {
+    sendToJava('sort_providers', { orderedIds });
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, providerId: string) => {
-    e.preventDefault();
-    if (draggedProviderId === null) return;
-    if (draggedProviderId !== providerId) {
-      setDragOverProviderId(providerId);
-    }
-  }, [draggedProviderId]);
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverProviderId(null);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetProviderId: string) => {
-    e.preventDefault();
-    if (draggedProviderId === null || draggedProviderId === targetProviderId) {
-      setDraggedProviderId(null);
-      setDragOverProviderId(null);
-      return;
-    }
-
-    const regularProviders = localProviders.filter(p => p.id !== LOCAL_PROVIDER_ID);
-    const draggedIndex = regularProviders.findIndex(p => p.id === draggedProviderId);
-    const targetIndex = regularProviders.findIndex(p => p.id === targetProviderId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedProviderId(null);
-      setDragOverProviderId(null);
-      return;
-    }
-
-    const newOrder = [...regularProviders];
-    const [removed] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, removed);
-
-    // Optimistic update: reflect new order immediately without waiting for backend
-    const localProvider = localProviders.find(p => p.id === LOCAL_PROVIDER_ID);
-    setLocalProviders(localProvider ? [localProvider, ...newOrder] : newOrder);
-
-    sendToJava('sort_providers', { orderedIds: newOrder.map(p => p.id) });
-
-    setDraggedProviderId(null);
-    setDragOverProviderId(null);
-  }, [draggedProviderId, localProviders]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedProviderId(null);
-    setDragOverProviderId(null);
-  }, []);
+  const {
+    localItems: localProviders,
+    draggedId: draggedProviderId,
+    dragOverId: dragOverProviderId,
+    handleDragStart,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDragEnd,
+  } = useDragSort({
+    items: providers,
+    onSort,
+    pinnedIds: [LOCAL_PROVIDER_ID],
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -439,7 +396,12 @@ export default function ProviderList({
               regularProviders.map((provider) => (
             <div
               key={provider.id}
-              className={`${styles.card} ${provider.isActive ? styles.active : ''} ${draggedProviderId === provider.id ? styles.dragging : ''} ${dragOverProviderId === provider.id ? styles.dragOver : ''}`}
+              className={[
+                styles.card,
+                provider.isActive && styles.active,
+                draggedProviderId === provider.id && styles.dragging,
+                dragOverProviderId === provider.id && styles.dragOver,
+              ].filter(Boolean).join(' ')}
               draggable={true}
               onDragStart={(e) => handleDragStart(e, provider.id)}
               onDragOver={(e) => handleDragOver(e, provider.id)}
