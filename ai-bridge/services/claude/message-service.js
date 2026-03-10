@@ -134,7 +134,7 @@ const ACCEPT_EDITS_AUTO_APPROVE_TOOLS = new Set([
 // - All READ_ONLY tools
 // - All AUTO_ALLOW_TOOLS
 // - TodoWrite, AskUserQuestion, ExitPlanMode for planning workflow
-// - Task for exploration agents
+// - Task/Agent for exploration agents
 // - Edit/Write for plan file only (handled separately in hook)
 const PLAN_MODE_ALLOWED_TOOLS = new Set([
   ...READ_ONLY_TOOLS,
@@ -142,6 +142,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set([
   // Planning workflow tools
   'AskUserQuestion',  // Ask user for clarification
   'Task',             // Allow Task for exploration agents
+  'Agent',            // Agent is an alias for Task
   'Skill',            // Allow skills during planning
 ]);
 
