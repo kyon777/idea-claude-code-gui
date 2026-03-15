@@ -646,7 +646,6 @@ public class CodexMcpServerManager {
             writer.write(MCP_INIT_REQUEST);
             writer.write("\n");
             writer.flush();
-            process.getOutputStream().close();
 
             Future<JsonObject> responseFuture = executor.submit(() -> readInitializeResponse(process));
             JsonObject response = responseFuture.get(STDIO_HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
