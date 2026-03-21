@@ -30,6 +30,8 @@ public class PlatformUtils {
     private static volatile Boolean cachedDevMode = null;
     // Real OS home directory cache
     private static volatile String cachedRealHomeDir = null;
+    // Temp directory cache
+    private static volatile String cachedTempDir = null;
 
     /**
      * Platform type enumeration.
@@ -495,11 +497,33 @@ public class PlatformUtils {
 
     /**
      * Get the system temporary directory.
+     * On Windows, checks TEMP → TMP → java.io.tmpdir in order.
+     * On Unix, checks TMPDIR → java.io.tmpdir.
+     * Result is cached after first invocation.
      *
-     * @return the temporary directory path
+     * @return the temporary directory path, or empty string if unavailable
      */
     public static String getTempDirectory() {
-        return System.getProperty("java.io.tmpdir", "");
+        if (cachedTempDir == null) {
+            synchronized (PlatformUtils.class) {
+                if (cachedTempDir == null) {
+                    String tempDir = null;
+                    if (isWindows()) {
+                        tempDir = getEnvIgnoreCase("TEMP");
+                        if (tempDir == null || tempDir.isEmpty()) {
+                            tempDir = getEnvIgnoreCase("TMP");
+                        }
+                    } else {
+                        tempDir = System.getenv("TMPDIR");
+                    }
+                    if (tempDir == null || tempDir.isEmpty()) {
+                        tempDir = System.getProperty("java.io.tmpdir", "");
+                    }
+                    cachedTempDir = tempDir;
+                }
+            }
+        }
+        return cachedTempDir;
     }
 
     /**
