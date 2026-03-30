@@ -9,10 +9,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
+import com.intellij.openapi.diagnostic.Logger;
+
 /**
  * Batches rapid streaming deltas before forwarding them to the webview bridge.
  */
 public final class StreamDeltaThrottler {
+
+    private static final Logger LOG = Logger.getInstance(StreamDeltaThrottler.class);
 
     public interface Scheduler {
         void schedule(Runnable runnable, long delayMs);
@@ -103,7 +107,14 @@ public final class StreamDeltaThrottler {
         }
 
         if (!disposed) {
-            flushConsumer.accept(text);
+            try {
+                flushConsumer.accept(text);
+            } catch (Exception e) {
+                // FIX: Prevent consumer exceptions from killing the scheduler thread.
+                // A failed flush (e.g., JCEF callJavaScript error) must not stop
+                // future delta deliveries.
+                LOG.warn("flushConsumer failed (chars=" + text.length() + "): " + e.getMessage(), e);
+            }
         }
     }
 

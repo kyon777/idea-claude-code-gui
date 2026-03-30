@@ -9,6 +9,15 @@ import type { UseWindowCallbacksOptions } from '../../useWindowCallbacks';
 import { sendBridgeEvent } from '../../../utils/bridge';
 import { THROTTLE_INTERVAL } from '../../useStreamingMessages';
 
+/**
+ * Timeout (ms) for detecting a stalled stream.  If no content/thinking delta
+ * arrives for this duration while isStreamingRef is still true, the frontend
+ * auto-recovers by forcing the stream-end cleanup.  This guards against the
+ * backend onStreamEnd signal being silently dropped by JCEF.
+ */
+const STREAM_STALL_TIMEOUT_MS = 45_000;
+const STREAM_STALL_CHECK_INTERVAL_MS = 5_000;
+
 export function registerStreamingCallbacks(options: UseWindowCallbacksOptions): void {
   const {
     setMessages,
@@ -37,10 +46,55 @@ export function registerStreamingCallbacks(options: UseWindowCallbacksOptions): 
     patchAssistantForStreaming,
   } = options;
 
+  // ── Stream stall watchdog ──
+  // Tracks the last time we received any streaming activity (delta or
+  // updateMessages during streaming).  A periodic check auto-recovers
+  // if the backend's onStreamEnd signal was silently lost.
+  // Exposed on window so messageCallbacks can also bump this on updateMessages.
+  //
+  // The interval handle is stored on `window` so that if registerStreamingCallbacks
+  // is called again (e.g., HMR, parent re-render), the previous interval is
+  // cleared first — preventing multiple watchdogs from running simultaneously.
+  if (window.__stallWatchdogInterval != null) {
+    clearInterval(window.__stallWatchdogInterval);
+    window.__stallWatchdogInterval = null;
+  }
+  window.__lastStreamActivityAt = 0;
+
+  const clearStallWatchdog = () => {
+    if (window.__stallWatchdogInterval != null) {
+      clearInterval(window.__stallWatchdogInterval);
+      window.__stallWatchdogInterval = null;
+    }
+  };
+
+  const startStallWatchdog = () => {
+    clearStallWatchdog();
+    window.__lastStreamActivityAt = Date.now();
+    window.__stallWatchdogInterval = setInterval(() => {
+      if (!isStreamingRef.current) {
+        clearStallWatchdog();
+        return;
+      }
+      const elapsed = Date.now() - (window.__lastStreamActivityAt ?? 0);
+      if (elapsed >= STREAM_STALL_TIMEOUT_MS) {
+        console.warn(
+          `[StreamWatchdog] Stream stalled for ${elapsed}ms — forcing stream-end recovery`,
+        );
+        clearStallWatchdog();
+        // Trigger the same cleanup as onStreamEnd
+        if (typeof window.onStreamEnd === 'function') {
+          window.onStreamEnd();
+        }
+      }
+    }, STREAM_STALL_CHECK_INTERVAL_MS);
+  };
+
   window.onStreamStart = () => {
     if (window.__sessionTransitioning) return;
     streamingContentRef.current = '';
     isStreamingRef.current = true;
+    startStallWatchdog();
     useBackendStreamingRenderRef.current = false;
     autoExpandedThinkingKeysRef.current.clear();
     setStreamingActive(true);
@@ -79,6 +133,7 @@ export function registerStreamingCallbacks(options: UseWindowCallbacksOptions): 
   window.onContentDelta = (delta: string) => {
     if (window.__sessionTransitioning) return;
     if (!isStreamingRef.current) return;
+    window.__lastStreamActivityAt = Date.now();
     streamingContentRef.current += delta;
     activeThinkingSegmentIndexRef.current = -1;
 
@@ -133,6 +188,7 @@ export function registerStreamingCallbacks(options: UseWindowCallbacksOptions): 
   window.onThinkingDelta = (delta: string) => {
     if (window.__sessionTransitioning) return;
     if (!isStreamingRef.current) return;
+    window.__lastStreamActivityAt = Date.now();
     activeTextSegmentIndexRef.current = -1;
 
     let forceUpdate = false;
@@ -184,6 +240,7 @@ export function registerStreamingCallbacks(options: UseWindowCallbacksOptions): 
 
   window.onStreamEnd = () => {
     if (window.__sessionTransitioning) return;
+    clearStallWatchdog();
     // Notify backend about stream completion for tab status indicator
     sendBridgeEvent('tab_status_changed', JSON.stringify({ status: 'completed' }));
 

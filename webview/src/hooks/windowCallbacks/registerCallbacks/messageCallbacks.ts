@@ -63,11 +63,23 @@ export function registerMessageCallbacks(
     return list;
   };
 
-  window.updateMessages = (json) => {
-    // During session transition, ignore message updates from stale session
-    // callbacks to prevent cleared messages from being restored
-    if (window.__sessionTransitioning) return;
+  // During streaming, buffer updateMessages calls and process only the latest
+  // one per animation frame. This prevents JSON.parse of large payloads from
+  // blocking the main thread on every coalescer push (which can arrive every
+  // 50ms), eliminating the "fake freeze" symptom.
+  //
+  // Stored on `window` so that if registerMessageCallbacks is called again
+  // (e.g., HMR, parent re-render), the previous pending rAF is cancelled
+  // first — preventing stale closures from executing.
+  if (window.__pendingUpdateRaf != null) {
+    cancelAnimationFrame(window.__pendingUpdateRaf);
+    window.__pendingUpdateRaf = null;
+    window.__pendingUpdateJson = null;
+  }
+  let pendingUpdateJson: string | null = null;
+  let pendingUpdateRaf: number | null = null;
 
+  const processUpdateMessages = (json: string) => {
     try {
       const parsed = JSON.parse(json) as ClaudeMessage[];
 
@@ -229,6 +241,46 @@ export function registerMessageCallbacks(
     }
   };
 
+  window.updateMessages = (json) => {
+    // During session transition, ignore message updates from stale session
+    // callbacks to prevent cleared messages from being restored
+    if (window.__sessionTransitioning) return;
+
+    // FIX: Bump stream stall watchdog — receiving updateMessages proves the
+    // backend→frontend bridge is alive even between content deltas (e.g.,
+    // during tool execution phases where no text is produced).
+    if (isStreamingRef.current && window.__lastStreamActivityAt !== undefined) {
+      window.__lastStreamActivityAt = Date.now();
+    }
+
+    // During streaming, coalesce rapid updateMessages calls into one-per-frame.
+    // The backend coalescer may push every 50ms; JSON.parse of large payloads
+    // (100KB+ for long conversations) blocks the main thread and causes dropped
+    // frames ("fake freeze"). Deferring to rAF ensures we only parse the latest
+    // payload and yield to the browser between frames.
+    if (isStreamingRef.current) {
+      pendingUpdateJson = json;
+      window.__pendingUpdateJson = json;
+      if (pendingUpdateRaf === null) {
+        const rafId = requestAnimationFrame(() => {
+          pendingUpdateRaf = null;
+          window.__pendingUpdateRaf = null;
+          const latestJson = pendingUpdateJson;
+          pendingUpdateJson = null;
+          window.__pendingUpdateJson = null;
+          if (latestJson) {
+            processUpdateMessages(latestJson);
+          }
+        });
+        pendingUpdateRaf = rafId;
+        window.__pendingUpdateRaf = rafId;
+      }
+      return;
+    }
+
+    processUpdateMessages(json);
+  };
+
   window.updateStatus = (text) => {
     // Do not release the transition guard from generic status updates.
     setStatus(text);
@@ -305,6 +357,15 @@ export function registerMessageCallbacks(
   };
 
   window.clearMessages = () => {
+    // Cancel any pending deferred updateMessages to prevent stale data from
+    // being applied after messages are cleared.
+    if (pendingUpdateRaf !== null) {
+      cancelAnimationFrame(pendingUpdateRaf);
+      pendingUpdateRaf = null;
+      pendingUpdateJson = null;
+      window.__pendingUpdateRaf = null;
+      window.__pendingUpdateJson = null;
+    }
     window.__deniedToolIds?.clear();
     resetTransientUiState();
     setMessages([]);

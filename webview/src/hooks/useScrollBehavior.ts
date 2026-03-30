@@ -150,12 +150,39 @@ export function useScrollBehavior({
 
   // Auto-scroll: follow latest content when user is at bottom
   // Includes streaming, expanded thinking blocks, loading indicator, etc.
+  // During streaming, debounce with rAF to coalesce rapid state changes
+  // from multiple update channels (onContentDelta + updateMessages) into
+  // a single scroll-to-bottom per frame, preventing visual jitter.
+  const scrollDebounceRef = useRef<number | null>(null);
+
   useLayoutEffect(() => {
     if (currentView !== 'chat') return;
     if (userPausedRef.current) return;
     if (!isUserAtBottomRef.current) return;
-    scrollToBottom();
+
+    if (streamingActive) {
+      if (scrollDebounceRef.current !== null) {
+        cancelAnimationFrame(scrollDebounceRef.current);
+      }
+      scrollDebounceRef.current = requestAnimationFrame(() => {
+        scrollDebounceRef.current = null;
+        if (!userPausedRef.current && isUserAtBottomRef.current) {
+          scrollToBottom();
+        }
+      });
+    } else {
+      scrollToBottom();
+    }
   }, [currentView, messages, expandedThinking, loading, streamingActive, scrollToBottom]);
+
+  // Cleanup scroll debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollDebounceRef.current !== null) {
+        cancelAnimationFrame(scrollDebounceRef.current);
+      }
+    };
+  }, []);
 
   // Scroll to bottom when switching back to chat view
   useEffect(() => {

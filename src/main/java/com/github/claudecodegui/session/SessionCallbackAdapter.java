@@ -218,20 +218,32 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
         if (isInactive()) {
             return;
         }
-        contentDeltaThrottler.flushNow();
-        thinkingDeltaThrottler.flushNow();
-        streamCoalescer.onStreamEnd();
+        // Each step is wrapped in safeRun so that a failure in one step
+        // (e.g., flushNow throwing due to a disposed throttler, or JCEF
+        // rejecting a large payload) does not prevent the critical
+        // onStreamEnd signal from reaching the frontend.
+        safeRun("contentDeltaThrottler.flushNow", contentDeltaThrottler::flushNow);
+        safeRun("thinkingDeltaThrottler.flushNow", thinkingDeltaThrottler::flushNow);
+        safeRun("streamCoalescer.onStreamEnd", streamCoalescer::onStreamEnd);
         streamCoalescer.flush(() -> {
             if (isInactive()) {
                 return;
             }
-            jsTarget.callJavaScript("onStreamEnd");
-            jsTarget.callJavaScript("showLoading", "false");
+            safeRun("callJavaScript(onStreamEnd)", () -> jsTarget.callJavaScript("onStreamEnd"));
+            safeRun("callJavaScript(showLoading, false)", () -> jsTarget.callJavaScript("showLoading", "false"));
             if (streamEndCallback != null) {
-                streamEndCallback.run();
+                safeRun("streamEndCallback", streamEndCallback);
             }
             LOG.debug("Stream ended - flushed messages before notifying frontend");
         });
+    }
+
+    private static void safeRun(String label, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            LOG.warn(label + " failed: " + e.getMessage(), e);
+        }
     }
 
     @Override

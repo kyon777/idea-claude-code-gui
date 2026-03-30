@@ -538,6 +538,25 @@ interface Window {
   __resetTransientUiState?: () => void;
 
   /**
+   * Timestamp of the last streaming activity (content/thinking delta or message update).
+   * Used by the stream stall watchdog to detect when the backend→frontend bridge is broken.
+   */
+  __lastStreamActivityAt?: number;
+
+  /**
+   * Interval handle for the stream stall watchdog.
+   * Stored on window so re-registration of streaming callbacks clears the previous interval.
+   */
+  __stallWatchdogInterval?: ReturnType<typeof setInterval> | null;
+
+  /**
+   * Pending rAF handle and JSON for deferred updateMessages processing.
+   * Stored on window so re-registration of message callbacks cancels stale rAFs.
+   */
+  __pendingUpdateRaf?: number | null;
+  __pendingUpdateJson?: string | null;
+
+  /**
    * Rewind result callback - returns the result of a rewind operation
    */
   onRewindResult?: (json: string) => void;
