@@ -5,6 +5,35 @@
 // ============ Constants ============
 
 /**
+ * Special pseudo provider IDs (not stored in config.json providers list)
+ * These represent special operational modes, not actual provider configurations.
+ */
+export const SPECIAL_PROVIDER_IDS = {
+  /** Disabled state - no active provider */
+  DISABLED: '__disabled__',
+  /** Local ~/.claude/settings.json mode */
+  LOCAL_SETTINGS: '__local_settings_json__',
+  /** CLI login authentication mode */
+  CLI_LOGIN: '__cli_login__',
+  /** Codex CLI login authentication mode */
+  CODEX_CLI_LOGIN: '__codex_cli_login__',
+} as const;
+
+/**
+ * Check if a provider ID is a special pseudo provider
+ * @param id - Provider ID to check
+ * @returns Whether this is a special pseudo provider that cannot be updated via update_provider
+ */
+export function isSpecialProviderId(id: string): boolean {
+  return (
+    id === SPECIAL_PROVIDER_IDS.DISABLED ||
+    id === SPECIAL_PROVIDER_IDS.LOCAL_SETTINGS ||
+    id === SPECIAL_PROVIDER_IDS.CLI_LOGIN ||
+    id === SPECIAL_PROVIDER_IDS.CODEX_CLI_LOGIN
+  );
+}
+
+/**
  * localStorage keys for provider-related data
  */
 export const STORAGE_KEYS = {

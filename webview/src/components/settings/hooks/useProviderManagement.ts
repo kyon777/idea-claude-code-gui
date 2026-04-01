@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderConfig } from '../../../types/provider';
+import { SPECIAL_PROVIDER_IDS } from '../../../types/provider';
 import { writeClaudeModelMapping } from '../../../utils/claudeModelMapping';
 
 const sendToJava = (message: string) => {
@@ -26,7 +27,6 @@ export interface UseProviderManagementOptions {
 }
 
 export function useProviderManagement(options: UseProviderManagementOptions = {}) {
-  const DISABLED_PROVIDER_ID = '__disabled__';
   const { t } = useTranslation();
   const { onError, onSuccess } = options;
 
@@ -186,7 +186,7 @@ export function useProviderManagement(options: UseProviderManagementOptions = {}
   const handleSwitchProvider = useCallback(
     (id: string) => {
       const data = { id };
-      if (id === DISABLED_PROVIDER_ID) {
+      if (id === SPECIAL_PROVIDER_IDS.DISABLED) {
         syncActiveProviderModelMapping(null);
         sendToJava(`switch_provider:${JSON.stringify(data)}`);
         setLoading(true);

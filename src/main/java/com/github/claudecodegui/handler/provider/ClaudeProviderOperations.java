@@ -1,6 +1,7 @@
 package com.github.claudecodegui.handler.provider;
 
 import com.github.claudecodegui.handler.core.HandlerContext;
+import com.github.claudecodegui.settings.ProviderManager;
 
 import com.github.claudecodegui.model.DeleteResult;
 import com.github.claudecodegui.util.PlatformUtils;
@@ -18,8 +19,6 @@ import java.nio.file.Paths;
  * Handles Claude provider CRUD operations and switching.
  */
 public class ClaudeProviderOperations {
-    private static final String DISABLED_PROVIDER_ID = "__disabled__";
-
     private static final Logger LOG = Logger.getInstance(ClaudeProviderOperations.class);
     private static final Gson GSON = new Gson();
 
@@ -146,6 +145,10 @@ public class ClaudeProviderOperations {
             String id = data.get("id").getAsString();
             JsonObject updates = data.getAsJsonObject("updates");
 
+            if (ProviderManager.LOCAL_SETTINGS_PROVIDER_ID.equals(id) || ProviderManager.CLI_LOGIN_PROVIDER_ID.equals(id)) {
+                throw new IllegalArgumentException("Special provider '" + id + "' cannot be updated via update_provider");
+            }
+
             context.getSettingsService().updateClaudeProvider(id, updates);
 
             boolean syncedActiveProvider = false;
@@ -230,7 +233,7 @@ public class ClaudeProviderOperations {
             JsonObject data = GSON.fromJson(content, JsonObject.class);
             String id = data.get("id").getAsString();
 
-            if (DISABLED_PROVIDER_ID.equals(id)) {
+            if (ProviderManager.DISABLED_PROVIDER_ID.equals(id)) {
                 context.getSettingsService().deactivateClaudeProvider();
 
                 ApplicationManager.getApplication().invokeLater(() -> {
@@ -243,7 +246,7 @@ public class ClaudeProviderOperations {
             }
 
             // Clean up CLI login flag when switching to any non-CLI-login provider
-            if (!"__cli_login__".equals(id)) {
+            if (!ProviderManager.CLI_LOGIN_PROVIDER_ID.equals(id)) {
                 try {
                     context.getSettingsService().removeCliLoginFromClaudeSettings();
                 } catch (Exception e) {
@@ -251,7 +254,7 @@ public class ClaudeProviderOperations {
                 }
             }
 
-            if ("__local_settings_json__".equals(id)) {
+            if (ProviderManager.LOCAL_SETTINGS_PROVIDER_ID.equals(id)) {
                 // Validate settings.json exists
                 Path settingsPath = Paths.get(PlatformUtils.getHomeDirectory(), ".claude", "settings.json");
                 if (!Files.exists(settingsPath)) {
@@ -297,7 +300,7 @@ public class ClaudeProviderOperations {
                 return;
             }
 
-            if ("__cli_login__".equals(id)) {
+            if (ProviderManager.CLI_LOGIN_PROVIDER_ID.equals(id)) {
                 // Apply CLI login mode to settings.json
                 context.getSettingsService().applyCliLoginToClaudeSettings();
 

@@ -27,6 +27,7 @@ import java.util.function.Function;
 public class ProviderManager {
     private static final Logger LOG = Logger.getInstance(ProviderManager.class);
     private static final String BACKUP_FILE_NAME = "config.json.bak";
+    public static final String DISABLED_PROVIDER_ID = "__disabled__";
     public static final String LOCAL_SETTINGS_PROVIDER_ID = "__local_settings_json__";
     public static final String CLI_LOGIN_PROVIDER_ID = "__cli_login__";
 

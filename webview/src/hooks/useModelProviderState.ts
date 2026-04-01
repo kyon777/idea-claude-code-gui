@@ -4,6 +4,7 @@ import { sendBridgeEvent } from '../utils/bridge';
 import { CLAUDE_MODELS, CODEX_MODELS, isValidPermissionMode } from '../components/ChatInputBox/types';
 import type { PermissionMode, ReasoningEffort, SelectedAgent } from '../components/ChatInputBox/types';
 import type { ProviderConfig } from '../types/provider';
+import { isSpecialProviderId } from '../types/provider';
 import { writeClaudeModelMapping } from '../utils/claudeModelMapping';
 
 export type ViewMode = 'chat' | 'history' | 'settings';
@@ -264,8 +265,18 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
 
   const handleToggleThinking = useCallback((enabled: boolean) => {
     const config = activeProviderConfigRef.current;
-    if (!config) {
-      setClaudeSettingsAlwaysThinkingEnabled(enabled);
+    const isSpecialProvider = isSpecialProviderId(config?.id || '');
+
+    setClaudeSettingsAlwaysThinkingEnabled(enabled);
+
+    if (!config || isSpecialProvider) {
+      setActiveProviderConfig(prev => prev ? {
+        ...prev,
+        settingsConfig: {
+          ...prev.settingsConfig,
+          alwaysThinkingEnabled: enabled
+        }
+      } : prev);
       sendBridgeEvent('set_thinking_enabled', JSON.stringify({ enabled }));
       addToast(enabled ? t('toast.thinkingEnabled') : t('toast.thinkingDisabled'), 'success');
       return;
