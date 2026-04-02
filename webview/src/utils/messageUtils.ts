@@ -356,12 +356,18 @@ export function getContentBlocks(
 ): ClaudeContentBlock[] {
   const rawBlocks = normalizeBlocksFn(message.raw);
   if (rawBlocks && rawBlocks.length > 0) {
-    // Streaming/tool scenario: if raw doesn't have text but message.content has text, still need to show text
+    // Streaming/tool scenario: if raw doesn't have text but message.content has text, still need to show text.
+    // But skip synthetic tool labels like "Tool: shell_command" because they duplicate the tool card.
     const hasTextBlock = rawBlocks.some(
       (block) => block.type === 'text' && typeof (block as any).text === 'string' && String((block as any).text).trim().length > 0,
     );
-    if (!hasTextBlock && message.content && message.content.trim()) {
-      return [...rawBlocks, { type: 'text', text: localizeMessage(message.content) }];
+    const trimmedContent = message.content?.trim() ?? '';
+    const isSyntheticToolLabel =
+      /^Tool:\s+\S+/i.test(trimmedContent)
+      && rawBlocks.every((block) => block.type === 'tool_use');
+
+    if (!hasTextBlock && trimmedContent && !isSyntheticToolLabel) {
+      return [...rawBlocks, { type: 'text', text: localizeMessage(message.content ?? '') }];
     }
     return rawBlocks;
   }

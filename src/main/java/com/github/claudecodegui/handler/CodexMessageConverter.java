@@ -314,7 +314,8 @@ public class CodexMessageConverter {
         JsonArray content = new JsonArray();
         content.add(toolUse);
 
-        frontendMsg.addProperty("content", "Tool: " + toolName);
+        // Keep content empty for pure tool_use messages so the frontend only renders the tool card.
+        frontendMsg.addProperty("content", "");
 
         JsonObject rawObj = new JsonObject();
         rawObj.add("content", content);
@@ -531,7 +532,8 @@ public class CodexMessageConverter {
         JsonArray content = new JsonArray();
         content.add(toolUse);
 
-        frontendMsg.addProperty("content", "Tool: " + toolName);
+        // Keep content empty for pure tool_use messages so the frontend only renders the tool card.
+        frontendMsg.addProperty("content", "");
 
         JsonObject rawObj = new JsonObject();
         rawObj.add("content", content);
