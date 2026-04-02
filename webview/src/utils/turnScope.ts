@@ -30,6 +30,24 @@ export function sliceLatestConversationTurn(messages: ClaudeMessage[]): ClaudeMe
   return start >= 0 ? messages.slice(start) : [];
 }
 
+export function findRecentConversationWindowStart(messages: ClaudeMessage[], turnCount: number): number {
+  if (turnCount <= 0 || messages.length === 0) return 0;
+
+  let remainingTurns = turnCount;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.type !== 'user') continue;
+    if (isToolResultOnlyUserMessage(message)) continue;
+
+    remainingTurns -= 1;
+    if (remainingTurns === 0) {
+      return i;
+    }
+  }
+
+  return 0;
+}
+
 export function finalizeTodosForSettledTurn(todos: TodoItem[], isStreaming: boolean): TodoItem[] {
   if (isStreaming) return todos;
   return todos.map((todo) => (

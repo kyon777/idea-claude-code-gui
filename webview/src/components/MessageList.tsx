@@ -2,13 +2,14 @@ import { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { TFunction } from 'i18next';
 import type { ClaudeMessage, ClaudeContentBlock, ToolResultBlock } from '../types';
 import { getMessageKey } from '../utils/messageUtils';
+import { findRecentConversationWindowStart } from '../utils/turnScope';
 import { MessageItem } from './MessageItem';
 import WaitingIndicator from './WaitingIndicator';
 import { ContextMenu } from './ContextMenu';
 import { useContextMenu, copySelection } from '../hooks/useContextMenu.js';
 
-/** Always render at least this many recent messages. Earlier messages are collapsed. */
-const VISIBLE_MESSAGE_WINDOW = 15;
+/** Always render at least this many recent real user turns. Earlier messages are collapsed. */
+const VISIBLE_USER_TURN_WINDOW = 6;
 
 function extractToolResultPreview(result: ToolResultBlock | null | undefined): string {
   if (!result) return 'pending';
@@ -98,16 +99,20 @@ export const MessageList = memo(function MessageList({
     firstMsgIdRef.current = currentFirstId;
   }, [messages]);
 
-  const shouldCollapse = !showAll && messages.length > VISIBLE_MESSAGE_WINDOW;
-  const collapsedCount = shouldCollapse ? messages.length - VISIBLE_MESSAGE_WINDOW : 0;
+  const conversationWindowStart = useMemo(
+    () => findRecentConversationWindowStart(messages, VISIBLE_USER_TURN_WINDOW),
+    [messages],
+  );
+  const shouldCollapse = !showAll && conversationWindowStart > 0;
+  const collapsedCount = shouldCollapse ? conversationWindowStart : 0;
 
   // Notify parent of collapsed count changes (for anchor rail sync)
   useEffect(() => {
     onCollapsedCountChange?.(collapsedCount);
   }, [collapsedCount, onCollapsedCountChange]);
   const visibleMessages = useMemo(
-    () => (shouldCollapse ? messages.slice(collapsedCount) : messages),
-    [messages, shouldCollapse, collapsedCount]
+    () => (shouldCollapse ? messages.slice(conversationWindowStart) : messages),
+    [messages, shouldCollapse, conversationWindowStart]
   );
 
   return (

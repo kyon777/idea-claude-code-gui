@@ -41,6 +41,13 @@ export interface ResetTransientUiStateOptions {
  */
 export const buildResetTransientUiState = (opts: ResetTransientUiStateOptions) => {
   return () => {
+    // Cancel any pending coalesced updateMessages work from the previous session.
+    // beginSessionTransition calls this helper directly, so we must clear the
+    // queued rAF path here as well instead of relying only on window.clearMessages.
+    if (typeof window.__cancelPendingUpdateMessages === 'function') {
+      window.__cancelPendingUpdateMessages();
+    }
+
     opts.clearToasts();
     opts.setStatus('');
     opts.setLoading(false);
@@ -70,6 +77,13 @@ export const buildResetTransientUiState = (opts: ResetTransientUiStateOptions) =
       clearTimeout(opts.thinkingUpdateTimeoutRef.current);
       opts.thinkingUpdateTimeoutRef.current = null;
     }
+
+    // Session-scoped snapshot sequencing must be reset whenever we switch
+    // sessions or reload history. Otherwise a freshly loaded session can have
+    // lower backend sequence numbers than the previous session, causing valid
+    // updateMessages snapshots to be dropped forever until history is reloaded.
+    window.__pendingUpdateMessages = undefined;
+    window.__minAcceptedUpdateSequence = 0;
   };
 };
 
